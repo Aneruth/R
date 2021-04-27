@@ -17,3 +17,6 @@ for(i in 1:10){
 }
 
 print('End of this file')
+
+# A vector is a list which contains object of different class.
+# An empty vector can be created using a vector function.
