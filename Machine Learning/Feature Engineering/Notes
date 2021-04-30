@@ -8,5 +8,28 @@ Based on this we can perform various methods such as:
     3. Analysis of Variance aka ANOVA
     4. Chi-Square Method
 
-Pearson's Correlatation: This measueres the linear correlateion btwn two datasets
+Pearson's Correlatation: This measueres the linear correlateion btwn two datasets. Package: ggpubr and inside cor(value1,value2,method = c(type_to_be _mention))
 
+Linear Discriminant Analysis: This calculates the mean for individual set and computes their probablity in which it belongs to. (for example what kind of group it is in) Package: lda()
+
+Analysis of Variance aka ANOVA: It estimates the quantitative depenedent variable based on the levels of one or more categorical independent variables.
+Ref: https://www.scribbr.com/statistics/anova-in-r/
+Types:
+  1. One-way ANOVA: we test the effects of 3 types of fertilizer on crop yield
+  2. Two-way ANOVA: we add an additional independent variable: planting density. We test the effects of 3 types of fertilizer and 2 different planting densities on crop yield
+
+Chi-Square: http://www.sthda.com/english/wiki/chi-square-test-of-independence-in-r
+Its' a  contengency table which is performed by null hypothesis.
+
+
+# Analyising our dataset
+
+  1. After seeing the dataset we can drop some unwanted columns such as quantity_group as it is similar to quantity.
+  2. We can aldo drop "recorded_by" as it consist of only one unique value and we can infer that all the data's are recorded by GeoData ....
+  3. We can also eliminate amount_tsh as there aretoo many missing values. We can infer this by seeing the dataset of that particular column where there are more 0's persent. There are 41639 missing values present in that column.
+  4. Eliminate public meeting column as there are too many empty values present: empty_string = 3334 
+  5. Similar to public we can also eliminate permit column as there are 3056 values of empty string.
+  6. We can consider the scheme_name column as there are too many categorical values (To be discussed: It can lead us to low accuracy.)
+  7. We can drop either payement or payment type as they look the same.
+
+PS: In dilema to drop construction year as we can see there is more 0 values present.

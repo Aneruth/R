@@ -11,6 +11,9 @@ test_summary <- summary(test)
 train_summary <- summary(train)
 label_summary <- summary(labels)
 
+# To check the unique values
+unique(labels[c(2)])
+
 # To view our dataset.
 View(test)
 
@@ -20,10 +23,24 @@ View(test)
 # View(dummy2)
 
 # Merging our train values with train labels (Fo r testing we merge dummy2 with dummy1 based on ID)
-train_df <- merge(train, labels, by.y = "id")
+train_df <- merge(train, labels, by.y = "id") # We are merging this as we can see that their "id" column is same and also assuming that this is the prediction column.
 dim(train_df)
 View(train_df)
 
-# Test case
-amna <- train_df[c(0:1), c(0:41)]
-View(amna)
+# Visualizing our target column
+as.data.frame(table(train_df$status_group))
+
+# Data Preprocessing
+
+# Fetching our dataset information
+str(train_df)
+
+###########################################################################################################################
+############################################## Data Preprocessing #########################################################
+###########################################################################################################################
+
+#  To check missing values in our dataset 
+count_amttsh <- table(train_df$amount_tsh)
+count_schname <- table(train_df$scheme_name)
+count_publicmeet <- table(train_df$public_meeting)
+count_permit <- table(train_df$permit)
