@@ -1,0 +1,12 @@
+Filter Methods
+
+As a preprocessing phase filtering methods are commonly used. The function collection is independent of some algorithms of machine learning. Instead, the characteristics are determined based on their results for the association with the result component in different statistical experiments. The relationship here is a subjective concept.
+
+Based on this we can perform various methods such as:
+    1. Pearson's Correlatation
+    2. Linear Discriminant Analysis
+    3. Analysis of Variance aka ANOVA
+    4. Chi-Square Method
+
+Pearson's Correlatation: This measueres the linear correlateion btwn two datasets
+
