@@ -40,7 +40,16 @@ str(train_df)
 ###########################################################################################################################
 
 #  To check missing values in our dataset 
-count_amttsh <- table(train_df$amount_tsh)
-count_schname <- table(train_df$scheme_name)
-count_publicmeet <- table(train_df$public_meeting)
-count_permit <- table(train_df$permit)
+# count_amttsh <- table(train_df$amount_tsh)
+# count_schname <- table(train_df$scheme_name)
+# count_publicmeet <- table(train_df$public_meeting)
+# count_permit <- table(train_df$permit)
+
+count_val <- length(subset(train_df$amount_tsh,train_df$amount_tsh==0))
+count_val
+
+for(i in colnames(train_df)){
+  if(train_df$i==0){
+    count <- length(subset(train_df$i,train_df$i==0))
+  }
+}
