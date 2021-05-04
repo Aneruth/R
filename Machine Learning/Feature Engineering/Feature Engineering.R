@@ -16,40 +16,43 @@ unique(labels[c(2)])
 
 # To view our dataset.
 View(test)
-
-# Creating a dummy variable
-# dummy1 <- data.frame(train)
-# dummy2 <- data.frame(labels)
-# View(dummy2)
-
-# Merging our train values with train labels (Fo r testing we merge dummy2 with dummy1 based on ID)
-train_df <- merge(train, labels, by.y = "id") # We are merging this as we can see that their "id" column is same and also assuming that this is the prediction column.
-dim(train_df)
-View(train_df)
+View(train)
 
 # Visualizing our target column
-as.data.frame(table(train_df$status_group))
-
-# Data Preprocessing
-
-# Fetching our dataset information
-str(train_df)
+as.data.frame(table(train$status_group))
 
 ###########################################################################################################################
 ############################################## Data Preprocessing #########################################################
 ###########################################################################################################################
+# Fetching our dataset information
+str(train)
 
 #  To check missing values in our dataset 
-# count_amttsh <- table(train_df$amount_tsh)
-# count_schname <- table(train_df$scheme_name)
-# count_publicmeet <- table(train_df$public_meeting)
-# count_permit <- table(train_df$permit)
+count_amttsh <- table(train$amount_tsh)
+count_schname <- table(train$scheme_name)
+count_publicmeet <- table(train$public_meeting)
+count_permit <- table(train$permit)
 
-count_val <- length(subset(train_df$amount_tsh,train_df$amount_tsh==0))
+# Print those missing values
+count_amttsh
+count_schname
+count_publicmeet
+count_permit
+
+count_val <- length(subset(train$amount_tsh,train$amount_tsh==0))
 count_val
 
-for(i in colnames(train_df)){
-  if(train_df$i==0){
-    count <- length(subset(train_df$i,train_df$i==0))
-  }
-}
+###########################################################################################################################
+############################################## Column  Drop ###############################################################
+###########################################################################################################################
+
+# Dropping Source type column
+drop <- c('amount_tsh','source_type','recorded_by','permit','public_meeting','scheme_name','waterpoint_type','quality_group','longitude','latitude')
+train <- train[ , !(names(train) %in% drop)]
+
+# Checking our dataset dimension
+dim(train) # From 40 columns we can say that it got reduced to 33 columns.
+
+# Testing
+df <- train
+df <- replace(df$construction_year, df$construction_year==0,mean(df$construction_year))
