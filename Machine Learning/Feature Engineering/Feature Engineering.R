@@ -52,7 +52,7 @@ train <- train[ , !names(train) %in% c('public_meeting')]
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('public_meeting')]
 
-# dim(train)
+dim(train)
 
 # Checking permit column
 table(train$permit)
@@ -63,7 +63,7 @@ train <- train[ , !names(train) %in% c('permit')]
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('permit')]
 
-# dim(train)
+dim(train)
 
 # Grouping extraction type,extraction type group and extraction type class
 View(data.frame(train$extraction_type,train$extraction_type_group,train$extraction_type_class))
@@ -88,7 +88,7 @@ train <- train[ , !names(train) %in% c('scheme_name')]
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('scheme_name')]
 
-# dim(train)
+dim(train)
 
 # Comparing the payment and payment_type
 View(train[c('payment','payment_type')])
@@ -98,7 +98,8 @@ train <- train[ , !names(train) %in% c('payment')]
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('payment')]
 
-# dim(train)
+dim(train)
+dim(test)
 
 # Comparing the water_quality and quality_group
 View(train[c('water_quality','quality_group')])
@@ -108,7 +109,8 @@ train <- train[ , !names(train) %in% c('quality_group')]
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('quality_group')]
 
-# dim(train)
+dim(train)
+dim(test)
 
 # Comparing the quantity and quantity_group
 View(train[c('quantity','quantity_group')])
@@ -152,19 +154,28 @@ dim(test)
 # Converting the date to days
 train$date_recorded = as.numeric(as.Date(Sys.Date()) - as.Date(c(train$date_recorded)))
 test$date_recorded = as.numeric(as.Date(Sys.Date()) - as.Date(c(test$date_recorded)))
-# View(train)
+View(train)
+View(test)
 
 # Replacing all 0 with NA
-train[train == 0]  <- NA
-test[test == 0]  <- NA
 
-# Considering the mean values for NA in population column
-train$population <- ifelse(is.na(train$population), mean(train$population, na.rm=TRUE), train$population)
-test$population <- ifelse(is.na(test$population), mean(test$population, na.rm=TRUE), test$population)
+# After analyzing we can say that 0's are present in two columns that is population and construction year so we consider their mean value
+replace_zeros <- function(x){
+  # converting that particular columns 0 values to NA and then considering the mean
+  x$population[x$population == 0] <- NA
+  x$construction_year[x$construction_year == 0] <- NA
+  
+  # Replacing the NA values to its respective mean
+  x$population <- ifelse(is.na(x$population), round(mean(x$population, na.rm=TRUE)), x$population)
+  x$construction_year <- ifelse(is.na(x$construction_year),round( mean(x$construction_year, na.rm=TRUE)), x$construction_year)
+  
+  return(x) # returning the dataset
+}
 
-# Considering the mean values for NA in Construction Year column
-train$construction_year <- ifelse(is.na(train$construction_year), mean(train$construction_year, na.rm=TRUE), train$construction_year)
-test$construction_year <- ifelse(is.na(test$construction_year), mean(test$construction_year, na.rm=TRUE), test$construction_year)
+df_train <- replace_zeros(train)
+df_test <- replace_zeros(test)
+View(df_train)
+View(df_test)
 
 # Converting the categorical value of to top 4 categorical values 
 clean_dataset <- function(x){
@@ -182,25 +193,25 @@ clean_dataset <- function(x){
   x$scheme_management <- ifelse(x$scheme_management != 'vwc' & x$scheme_management != 'wug' & x$scheme_management != 'water_auth' & x$scheme_management != 'water_board' ,'other_schmgt',x$scheme_management)
   
   # Considering the extraction_type column
-  x$extraction_type <- ifelse(x$extraction_type != 'gravity' & x$extraction_type != 'nira/tanira' ,'other_exttype',x$extraction_type)
+  x$extraction_type <- ifelse(x$extraction_type != 'gravity','other_exttype',x$extraction_type)
   
   # Considering the extraction_type_class column
   x$extraction_type_class <- ifelse(x$extraction_type_class != 'gravity' & x$extraction_type_class != 'handpump' ,'other_extclass',x$extraction_type_class)
   
   # Considering the management column
-  x$management <- ifelse(x$management != 'vwc' & x$management != 'wug' & x$management != 'wua' & x$management != 'water board','other_mgt',x$management)
+  x$management <- ifelse(x$management != 'vwc' & x$management != 'wug' & x$management != 'wua','other_mgt',x$management)
   
   # Considering the management_group column
-  x$management_group <- ifelse(x$management_group != 'user-group' & x$management_group != 'commercial','other_mgtgroup',x$management_group)
+  x$management_group <- ifelse(x$management_group != 'user-group','other_mgtgroup',x$management_group)
   
-  # Considering the payment column
-  x$payment_type <- ifelse(x$payment_type != 'per bucket' & x$payment_type != 'never pay' & x$payment_type != 'monthly','other_payemt',x$payment_type)
+  # Considering the payment_type column
+  x$payment_type <- ifelse(x$payment_type != 'never pay','other_payemt',x$payment_type)
   
   # Considering the water_quality column
-  x$water_quality <- ifelse(x$water_quality != 'soft' & x$water_quality != 'salty','other_waterqual',x$water_quality)
+  x$water_quality <- ifelse(x$water_quality != 'soft' ,'other_waterqual',x$water_quality)
   
   # Considering the quantity column
-  x$quantity <- ifelse(x$quantity != 'insufficient' & x$quantity != 'dry' & x$quantity != 'enough','other_quantity',x$quantity)
+  x$quantity <- ifelse(x$quantity != 'insufficient' & x$quantity != 'enough','other_quantity',x$quantity)
   
   # Considering the source column
   x$source <- ifelse(x$source != 'shallow well' & x$source != 'spring' & x$source != 'machine dbh' & x$source != 'river','other_source',x$source)
@@ -213,19 +224,56 @@ clean_dataset <- function(x){
   return(x) # Returns the dataset
 }
 
-cleaned_train <- clean_dataset(train)
-cleaned_test <- clean_dataset(test)
+labels_rename <- function(x){
+  x$status_group <- ifelse(x$status_group == "functional",0,x$status_group)
+  x$status_group <- ifelse(x$status_group == "non functional",1,x$status_group)
+  x$status_group <- ifelse(x$status_group == "functional needs repair",2,x$status_group)
+  return(x)
+}
+
+cleaned_train <- clean_dataset(df_train)
+cleaned_test <- clean_dataset(df_test)
+cleaned_lab <- labels_rename(labels)
 View(cleaned_train)
 View(cleaned_test)
+View(cleaned_lab)
 
+# dmy <- dummyVars(" ~ .", data = customers, fullRank=T)
+# trsf <- data.frame(predict(dmy, newdata = customers))
 
 # Performing one hot encoding
-train_1h <- data.frame(predict(dummyVars(" ~ .", data = cleaned_train, fullRank = T), newdata = cleaned_train))
-test_1h <- data.frame(predict(dummyVars(" ~ .", data = cleaned_test, fullRank = T), newdata = cleaned_test))
+# train_1h <- data.frame(predict(dummyVars(" ~ .", data = cleaned_train, fullRank = T), newdata = cleaned_train))
+train_dmy <- dummyVars(' ~ .',data = cleaned_train,fullRank = T)
+train_1h <- data.frame(predict(train_dmy, newdata = cleaned_train))
 
-###################################################### TESTING ###################################################################
+test_dmy <- dummyVars(' ~ .',data = cleaned_test,fullRank = T)
+test_1h <- data.frame(predict(test_dmy, newdata = cleaned_test))
+# test_1h <- data.frame(predict(dummyVars(" ~ .", data = cleaned_test, fullRank = T), newdata = cleaned_test))
+# label_1h <- data.frame(predict(dummyVars(" ~ .", data = labels, fullRank = T), newdata = labels))
 
-###################################################### TESTING #################################################################
+# Machine Learning
+library(randomForest)
+target_variable <- cleaned_lab$status_group
+train_idx <- sample(1:nrow(train_1h))
+half_split <- floor(nrow(train_1h)/2)
+train_data <- train_1h[train_idx[1:half_split],]
+test_data <- train_1h[train_idx[(half_split+1):nrow(train_1h)],]
+y_train = as.factor(target_variable[train_idx[1:half_split]]) 
+y_test = as.factor(target_variable[train_idx[(half_split+1):nrow(train_1h)]])
+model <- randomForest(x=train_data,
+                      y=y_train,
+                      xtest=test_data,
+                      ytest=y_test,
+                      ntree=100)
+# accuracy_vec <- 0
+accuracy_vec = (model$test$confusion[1,1]+model$test$confusion[2,2])/sum(model$test$confusion)
+print(accuracy_vec)
+
+
+
+
+
+
 
 
 
