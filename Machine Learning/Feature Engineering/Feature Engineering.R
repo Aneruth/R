@@ -225,9 +225,9 @@ clean_dataset <- function(x){
 }
 
 labels_rename <- function(x){
-  x$status_group <- ifelse(x$status_group == "functional",0,x$status_group)
-  x$status_group <- ifelse(x$status_group == "non functional",1,x$status_group)
-  x$status_group <- ifelse(x$status_group == "functional needs repair",2,x$status_group)
+  x$status_group <- ifelse(x$status_group == "functional",as.numeric(0),x$status_group)
+  x$status_group <- ifelse(x$status_group == "non functional",as.numeric(1),x$status_group)
+  x$status_group <- ifelse(x$status_group == "functional needs repair",as.numeric(2),x$status_group)
   return(x)
 }
 
@@ -248,32 +248,51 @@ train_1h <- data.frame(predict(train_dmy, newdata = cleaned_train))
 
 test_dmy <- dummyVars(' ~ .',data = cleaned_test,fullRank = T)
 test_1h <- data.frame(predict(test_dmy, newdata = cleaned_test))
-# test_1h <- data.frame(predict(dummyVars(" ~ .", data = cleaned_test, fullRank = T), newdata = cleaned_test))
-# label_1h <- data.frame(predict(dummyVars(" ~ .", data = labels, fullRank = T), newdata = labels))
+
+train_1h <- data.frame(cbind(train_1h,as.factor(cleaned_lab$status_group))) # Considering the status as factor column
 
 # Machine Learning
 library(randomForest)
-target_variable <- cleaned_lab$status_group
-train_idx <- sample(1:nrow(train_1h))
-half_split <- floor(nrow(train_1h)/2)
-train_data <- train_1h[train_idx[1:half_split],]
-test_data <- train_1h[train_idx[(half_split+1):nrow(train_1h)],]
-y_train = as.factor(target_variable[train_idx[1:half_split]]) 
-y_test = as.factor(target_variable[train_idx[(half_split+1):nrow(train_1h)]])
-model <- randomForest(x=train_data,
-                      y=y_train,
-                      xtest=test_data,
-                      ytest=y_test,
-                      ntree=100)
-# accuracy_vec <- 0
-accuracy_vec = (model$test$confusion[1,1]+model$test$confusion[2,2])/sum(model$test$confusion)
-print(accuracy_vec)
 
 
+# Performing train test and split the dataset
+idx = sample(2,nrow(train_1h),replace = TRUE, prob = c(0.7,0.3)) # Splitting the dataset into 70:30 ratio that is 70% training and 30% testing.
 
+# Training data
+first_half_data = train_1h[idx == 1,]
 
+# Testing data
+second_half_data = train_1h[idx == 2,]
 
+# Object random forest model
+rfm = randomForest(as.factor.cleaned_lab.status_group.~.,data = first_half_data) # The dot after ~ present all other variables
 
+# Accuracy checking
+rm_predict = predict(rfm,second_half_data)
+# Adding the predicted dataset to our test dataset 
+second_half_data$pred_value = rm_predict
 
+# Building the confusion matrix
+conf_matrix = table(second_half_data$as.factor.cleaned_lab.status_group.,second_half_data$pred_value)
+conf_matrix
+accuracy_randomForest = sum(diag(conf_matrix)/sum(conf_matrix))
+paste0('Accuracy Score for random forest using train test split : ',round(accuracy_randomForest*100),'%')
 
+# ID3 Algorithm
+library(party) # Package that is used to find the DT algorithm
+str(train_1h)
 
+# Train test split out dataset
+dt <- ctree(as.factor.cleaned_lab.status_group. ~ ., data = first_half_data)
+
+# Predictions probability for DT
+dt_prob <- predict(dt,second_half_data,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
+
+# Predictions for DT
+dt_pred <- predict(dt,second_half_data)
+second_half_data$dt_pred = dt_pred
+
+conf_dt_matrix = table(second_half_data$as.factor.cleaned_lab.status_group.,second_half_data$dt_pred)
+conf_dt_matrix
+accuracy_dt = sum(diag(conf_dt_matrix)/sum(conf_dt_matrix))
+paste0('Accuracy Score for Decision Tree using train test split : ',round(accuracy_dt*100),'%')
