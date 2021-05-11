@@ -143,10 +143,10 @@ test <- test[ , !names(test) %in% c('waterpoint_type_group')]
 # dim(train)
 
 # drop columns
-train <- train[ , !names(train) %in% c('id','wpt_name','num_private','longitude','latitude','lga','ward','amount_tsh','subvillage','region','gps_height','funder','installer')]
+train <- train[ , !names(train) %in% c('id','wpt_name','num_private','lga','ward','amount_tsh','subvillage','region','funder','installer')]
 
 # Doing the above for test data
-test <- test[ , !names(test) %in% c('id','wpt_name','num_private','longitude','latitude','lga','ward','amount_tsh','subvillage','region','gps_height','funder','installer')]
+test <- test[ , !names(test) %in% c('id','wpt_name','num_private','lga','ward','amount_tsh','subvillage','region','funder','installer')]
 
 dim(train)
 dim(test)
@@ -168,6 +168,7 @@ replace_zeros <- function(x){
   # Replacing the NA values to its respective mean
   x$population <- ifelse(is.na(x$population), round(mean(x$population, na.rm=TRUE)), x$population)
   x$construction_year <- ifelse(is.na(x$construction_year),round( mean(x$construction_year, na.rm=TRUE)), x$construction_year)
+  x$gps_height <- ifelse(is.na(x$gps_height),round( mean(x$gps_height, na.rm=TRUE)), x$gps_height)
   
   return(x) # returning the dataset
 }
@@ -250,49 +251,86 @@ test_dmy <- dummyVars(' ~ .',data = cleaned_test,fullRank = T)
 test_1h <- data.frame(predict(test_dmy, newdata = cleaned_test))
 
 train_1h <- data.frame(cbind(train_1h,as.factor(cleaned_lab$status_group))) # Considering the status as factor column
+names(train_1h)[36] <- 'status_group'
 
-# Machine Learning
+####################
+# Machine Learning #
+####################
+
+#################
+# Random Forest #
+#################
+
 library(randomForest)
-
 
 # Performing train test and split the dataset
 idx = sample(2,nrow(train_1h),replace = TRUE, prob = c(0.7,0.3)) # Splitting the dataset into 70:30 ratio that is 70% training and 30% testing.
 
 # Training data
-first_half_data = train_1h[idx == 1,]
+data_train = train_1h[idx == 1,]
 
 # Testing data
-second_half_data = train_1h[idx == 2,]
+data_test = train_1h[idx == 2,]
 
 # Object random forest model
-rfm = randomForest(as.factor.cleaned_lab.status_group.~.,data = first_half_data) # The dot after ~ present all other variables
+rfm = randomForest(status_group~.,data = data_train) # The dot after ~ present all other variables
 
 # Accuracy checking
-rm_predict = predict(rfm,second_half_data)
-# Adding the predicted dataset to our test dataset 
-second_half_data$pred_value = rm_predict
+Y_pred <- predict(rfm,data_test[,-36])
+Y <- data_test[,36]
 
 # Building the confusion matrix
-conf_matrix = table(second_half_data$as.factor.cleaned_lab.status_group.,second_half_data$pred_value)
-conf_matrix
-accuracy_randomForest = sum(diag(conf_matrix)/sum(conf_matrix))
+confusion_matrix <- table(Y_pred,Y)
+confusion_matrix
+accuracy_randomForest = sum(diag(confusion_matrix)/sum(confusion_matrix))
 paste0('Accuracy Score for random forest using train test split : ',round(accuracy_randomForest*100),'%')
 
-# ID3 Algorithm
-library(party) # Package that is used to find the DT algorithm
+# Hyperparameterizing
+accuracy_vec <- array(0,36)
+for (i in 1:36){ #print(i)
+  model <- randomForest(x=data_train[,-36],
+                        y=as.factor(data_train[,36]),
+                        xtest=data_test[,-36],
+                        ytest=as.factor(data_test[,36]),
+                        ntree=i)
+  
+  accuracy_vec[i] = (model$test$confusion[1,1]+model$test$confusion[2,2])/sum(model$test$confusion)
+}
+print(accuracy_vec)
+
+#################
+# ID3 Algorithm #
+#################
+
+library(rpart) # Package that is used to find the DT algorithm
 str(train_1h)
 
 # Train test split out dataset
-dt <- ctree(as.factor.cleaned_lab.status_group. ~ ., data = first_half_data)
+dt <- rpart(status_group ~ ., data = data_train)
 
 # Predictions probability for DT
-dt_prob <- predict(dt,second_half_data,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
+dt_prob <- predict(dt,data_test,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
 
 # Predictions for DT
-dt_pred <- predict(dt,second_half_data)
-second_half_data$dt_pred = dt_pred
+dt_pred <- predict(dt,data_test)
 
-conf_dt_matrix = table(second_half_data$as.factor.cleaned_lab.status_group.,second_half_data$dt_pred)
-conf_dt_matrix
-accuracy_dt = sum(diag(conf_dt_matrix)/sum(conf_dt_matrix))
+# Accuracy printing 
+pred <- predict(dt,data_train,type='class')
+confusion_matrix_dt <- table(pred,data_train$status_group)
+confusion_matrix_dt
+accuracy_dt = sum(diag(confusion_matrix_dt)/sum(confusion_matrix_dt))
 paste0('Accuracy Score for Decision Tree using train test split : ',round(accuracy_dt*100),'%')
+
+#################
+# KNN Algorithm #
+#################
+
+library(class)
+Ypred_knn=knn(data_train,data_test,data_train$status_group,k=3)
+KNN <- table(Ypred_knn,data_test$status_group)
+knn_acc <- sum(diag(KNN)/sum(KNN))
+paste0('Accuracy Score for KNN using train test split : ',round(knn_acc*100),'%')
+
+
+# 
+
