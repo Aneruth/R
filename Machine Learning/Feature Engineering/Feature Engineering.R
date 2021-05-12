@@ -2,12 +2,18 @@
 library(ggplot2)
 library(dplyr)
 library(caret) # Package to perform one hot encoding
+library(ggmap)
+library(scales)
+library(RColorBrewer)
 
 # Load the dataset
 test <- read.csv('/Users/aneruthmohanasundaram/Documents/GitHub/R-Basics/Machine Learning/Datasets/Test_set_values.csv')
 train <- read.csv('/Users/aneruthmohanasundaram/Documents/GitHub/R-Basics/Machine Learning/Datasets/Training_set_values.csv')
 labels <- read.csv('/Users/aneruthmohanasundaram/Documents/GitHub/R-Basics/Machine Learning/Datasets/Training_set_labels.csv')
 
+# Ddataset used for visualization
+dummy <- data.frame(cbind(train,as.factor(labels$status_group))) # Considering the status as factor column
+names(dummy)[41] <- 'status_group'
 # Analyzing the dataset
 dim(train)  # To check the shape of our dataset
 
@@ -22,7 +28,67 @@ lab <- with(labels,table(status_group))
 ggplot(as.data.frame(tb), aes(factor(extraction_type_class), Freq)) + geom_col(position = 'dodge')
 
 # Analyzing labels
-ggplot(as.data.frame(lab), aes(factor(status_group), Freq)) + geom_col(position = 'dodge')
+ggplot(data=train_1h, aes(x=status_group)) + 
+  geom_bar(aes(y = (..count..)/sum(..count..)), fill=brewer.pal(3, "Set1"), alpha = 1/2) + 
+  geom_text(aes(y = ((..count..)/sum(..count..)), label = scales::percent((..count..)/sum(..count..))), 
+            stat = "count", vjust = -0.25) +
+  scale_y_continuous(labels = percent) +
+  theme(axis.text.y=element_blank(), axis.ticks=element_blank(), axis.title.y=element_blank()) +
+  theme(plot.title = element_text(hjust = 0.5, face="bold")) +
+  xlab("Operational Status") + ylab("Percent")
+
+
+# Visualize Regions
+color_label <- c("#66FF00", "#0099CC", "#FF6666")
+table(dummy$status_group, dummy$construction_year)
+prop.table(table(dummy$status_group, dummy$construction_year), margin = 2)
+
+# "Eliminating" the construction year of 0 (probably indicating missing data for year) for better graph representation
+ggplot(subset(dummy, construction_year > 0),
+       aes(x = construction_year, fill = status_group)) + 
+  geom_bar() +
+  xlab("Construction year")  +
+  ylab("Number of waterpoints") +
+  labs(fill = "Status of waterpoint") +
+  scale_fill_manual(values=color_label)
+
+# Look at distribution of labels per basin
+ggplot(dummy,
+       aes(x = basin, fill = status_group)) + 
+  geom_bar() +
+  xlab("Basin")  +
+  theme(axis.text.x=element_text(angle = 20, hjust = 1)) +
+  ylab("Number of waterpoints") +
+  labs(fill = "Status of waterpoint") +
+  theme(legend.position = "top") +
+  scale_fill_manual(values=color_label)
+
+# Water Quantity
+ggplot(dummy,
+       aes(x = quantity, fill = status_group)) + 
+  geom_bar() +
+  xlab("Basin") +
+  ylab("Number of waterpoints") +
+  labs(fill = "Status of waterpoint") +
+  theme(legend.position = "top") +
+  scale_fill_manual(values=color_label)
+
+# Create bar plot for source_type
+qplot(source_type, data=dummy, geom="bar", fill=status_group) + 
+  theme(legend.position = "top") + 
+  labs(fill = "Status of waterpoint") +
+  theme(axis.text.x=element_text(angle = 20, hjust = 1)) + 
+  scale_fill_manual(values=color_label) + 
+  xlab("Type of water source") +
+  ylab("Number of waterpoints")
+
+# Look at distribution of labels per total static head 
+ggplot(subset(dummy, amount_tsh <20000 & amount_tsh >0),
+       aes(x = amount_tsh)) + 
+  geom_histogram(bins = 20) +
+  facet_wrap(~ status_group) +
+  xlab("Total Static Head") +
+  ylab("Number of waterpoints")
 
 # To get the unique values of recorded_by
 unique(train['recorded_by'])
@@ -398,4 +464,23 @@ for(i in 1:10){
   dj <- sum(diag(dt_matrix)/sum(dt_matrix))
 }
 
-########################################################################################################
+#######################
+# Deep neural network #
+#######################
+library(reticulate)
+library(keras)
+require(keras)
+require(tensorflow)
+
+model <- keras_model_sequential()
+model %>% 
+  layer_dense(units = 8,activation = 'relu',input_shape = c(36))%>%
+  layer_dense(units = 3,activation = 'softmax')
+
+# Compile
+model %>% 
+  compile(loss = 'categorical_crossentropy',optimizer = 'adam',metrics = 'accuracy')
+
+# Fit the model
+history <- model %>% 
+  fit(data_train,train_1h,epoch=200,batch_size=32,validation_split=0.2)
