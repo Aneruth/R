@@ -256,28 +256,22 @@ names(train_1h)[36] <- 'status_group'
 ####################
 # Machine Learning #
 ####################
-
+# Performing train test and split the dataset
+dt = sort(sample(nrow(train_1h), nrow(train_1h)*.8))
+data_train<-train_1h[dt,]
+data_test<-train_1h[-dt,]
 #################
 # Random Forest #
 #################
 
 library(randomForest)
 
-# Performing train test and split the dataset
-idx = sample(2,nrow(train_1h),replace = TRUE, prob = c(0.7,0.3)) # Splitting the dataset into 70:30 ratio that is 70% training and 30% testing.
-
-# Training data
-data_train = train_1h[idx == 1,]
-
-# Testing data
-data_test = train_1h[idx == 2,]
-
 # Object random forest model
-rfm = randomForest(status_group~.,data = data_train) # The dot after ~ present all other variables
+rfm = randomForest(status_group~.,data = data_train,ntree=100)
 
 # Accuracy checking
-Y_pred <- predict(rfm,data_test[,-36])
-Y <- data_test[,36]
+Y_pred <- predict(rfm,data_test[,-ncol(data_test)])
+Y <- data_test[,ncol(data_test)]
 
 # Building the confusion matrix
 confusion_matrix <- table(Y_pred,Y)
@@ -306,20 +300,70 @@ library(rpart) # Package that is used to find the DT algorithm
 str(train_1h)
 
 # Train test split out dataset
-dt <- rpart(status_group ~ ., data = data_train)
+dtree <- rpart(status_group ~ ., data = data_train)
 
 # Predictions probability for DT
-dt_prob <- predict(dt,data_test,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
+dt_prob <- predict(dtree,data_test,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
 
 # Predictions for DT
-dt_pred <- predict(dt,data_test)
+dt_pred <- predict(dtree,data_test)
 
 # Accuracy printing 
-pred <- predict(dt,data_train,type='class')
+pred <- predict(dtree,data_train,type='class')
 confusion_matrix_dt <- table(pred,data_train$status_group)
 confusion_matrix_dt
 accuracy_dt = sum(diag(confusion_matrix_dt)/sum(confusion_matrix_dt))
 paste0('Accuracy Score for Decision Tree using train test split : ',round(accuracy_dt*100),'%')
+
+# Hyperparameterizing the ID3 algorithm using 10 cross validation
+n_trees <- 10 
+threshold <- 0.5
+
+spam_idx <- sample(1:nrow(train_1h))
+half_split <- floor(nrow(train_1h)/2)
+target_variable <- ncol(train_1h)
+
+feature_values <- seq(5,58,5)
+accuracy_vec <- numeric()
+
+for (features_per_tree in feature_values)
+{
+  Y_trees <- numeric()
+  
+  for(i in 1:n_trees){
+    #3.1 Sample the features
+    selected_features <- sample(1:(ncol(train_1h)-1),features_per_tree)
+    
+    #3.2 Take the first half of the dataset as a training data set with bootstrap for each tree
+    bootstrap_idx <- sample(1:half_split,replace = T)
+    train_data <- train_1h[spam_idx[bootstrap_idx],c(selected_features,target_variable)]
+    
+    #3.3 Take the second half of the dataset as a hold out or test data set
+    test_data <- train_1h[spam_idx[(half_split+1):nrow(train_1h)],c(selected_features,target_variable)]
+    
+    #3.4 Fit a model on the training set and evaluate it on the test set
+    model <- rpart(status_group ~ ., method="class",data=train_data)
+    Y_pred <- predict(model,subset(test_data, select=-c(status_group)))
+    
+    #3.5 Store the prediction of each tree (2 is to take only the P(Y="spam"|x))
+    Y_trees <- cbind(Y_trees,Y_pred[,2])
+  }
+  
+  # Calculate the ensemble prediction
+  Y_hat <- apply(Y_trees,1,mean)
+  Y_hat <- ifelse(Y_hat > threshold,"yes","no") 
+  
+  # Evaluate the predictions
+  Y <- test_data[,"status_group"]
+  confusion_matrix <- table(Y_hat,Y)
+  confusion_matrix
+  
+  accuracy = (confusion_matrix[1,1]+confusion_matrix[2,2])/sum(confusion_matrix)
+  misclassification_rate = 1 - accuracy
+  accuracy_vec <- cbind(accuracy_vec,accuracy)
+  # print(paste("[INFO] - Misclassification rate -",features_per_tree,"features :",misclassification_rate))
+  print(paste("[INFO] - Accuracy rate -",accuracy_vec,"Misclassification rate :",misclassification_rate))
+}
 
 #################
 # KNN Algorithm #
@@ -331,6 +375,27 @@ KNN <- table(Ypred_knn,data_test$status_group)
 knn_acc <- sum(diag(KNN)/sum(KNN))
 paste0('Accuracy Score for KNN using train test split : ',round(knn_acc*100),'%')
 
+dt_pred2 <- as.numeric(as.character(Ypred_knn))
+cross_valid_knn <- data.frame(rmse = RMSE(dt_pred2,label1),mae = MAE(dt_pred2,label1))
+print(cross_valid_knn)
 
-# 
 
+
+Data<-train_1h[sample(nrow(train_1h)),]
+
+#Create 10 equally size folds
+folds <- cut(seq(1,nrow(Data)),breaks=10,labels=FALSE)
+
+#Perform 10 fold cross validation
+for(i in 1:10){
+  #Segement your data by fold using the which() function
+  Idx <- which(folds==i,arr.ind=TRUE)
+  testData <- Data[Idx, ]
+  trainData <- Data[-Idx, ]
+  Ypred_knn=knn(trainData,testData,trainData$status_group,k=i)
+  KNN <- table(as.numeric(as.character(Ypred_knn)),testData$status_group)
+  knn_acc <- sum(diag(KNN)/sum(KNN))
+  dj <- sum(diag(dt_matrix)/sum(dt_matrix))
+}
+
+########################################################################################################
