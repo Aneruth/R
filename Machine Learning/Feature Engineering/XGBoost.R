@@ -1,8 +1,7 @@
-# Load the lib 
 library(ggplot2)
 library(dplyr)
 library(caret) # Package to perform one hot encoding
-library(ggmap)
+
 library(scales)
 library(RColorBrewer)
 library(caTools)
@@ -12,19 +11,11 @@ test <- read.csv('/Users/aneruthmohanasundaram/Documents/GitHub/R-Basics/Machine
 train <- read.csv('/Users/aneruthmohanasundaram/Documents/GitHub/R-Basics/Machine Learning/Datasets/Training_set_values.csv')
 labels <- read.csv('/Users/aneruthmohanasundaram/Documents/GitHub/R-Basics/Machine Learning/Datasets/Training_set_labels.csv')
 
-# Ddataset used for visualization
-dummy <- data.frame(cbind(train,as.factor(labels$status_group))) # Considering the status as factor column
-names(dummy)[41] <- 'status_group'
-# Analyzing the dataset
-dim(train)  # To check the shape of our dataset
+train <- data.frame(cbind(train,as.factor(labels$status_group)))
+names(train)[41] <- 'status_group'
 
-# Describing the dataset
-
-
-# Analyzing the dataset
 tb <- with(train,table(extraction_type_class))
 lab <- with(labels,table(status_group))
-
 # Analyzing extraction_type_class
 ggplot(as.data.frame(tb), aes(factor(extraction_type_class), Freq)) + geom_col(position = 'dodge')
 
@@ -38,14 +29,13 @@ ggplot(data=train_1h, aes(x=status_group)) +
   theme(plot.title = element_text(hjust = 0.5, face="bold")) +
   xlab("Operational Status") + ylab("Percent")
 
-
 # Visualize Regions
 color_label <- c("#66FF00", "#0099CC", "#FF6666")
-table(dummy$status_group, dummy$construction_year)
-prop.table(table(dummy$status_group, dummy$construction_year), margin = 2)
+table(train$status_group, train$construction_year)
+prop.table(table(train$status_group, train$construction_year), margin = 2)
 
 # "Eliminating" the construction year of 0 (probably indicating missing data for year) for better graph representation
-ggplot(subset(dummy, construction_year > 0),
+ggplot(subset(train, construction_year > 0),
        aes(x = construction_year, fill = status_group)) + 
   geom_bar() +
   xlab("Construction year")  +
@@ -54,7 +44,7 @@ ggplot(subset(dummy, construction_year > 0),
   scale_fill_manual(values=color_label)
 
 # Look at distribution of labels per basin
-ggplot(dummy,
+ggplot(train,
        aes(x = basin, fill = status_group)) + 
   geom_bar() +
   xlab("Basin")  +
@@ -64,18 +54,18 @@ ggplot(dummy,
   theme(legend.position = "top") +
   scale_fill_manual(values=color_label)
 
-# Water Quantity
-ggplot(dummy,
+# Quantity
+ggplot(train,
        aes(x = quantity, fill = status_group)) + 
   geom_bar() +
-  xlab("Basin") +
+  xlab("Quantity") +
   ylab("Number of waterpoints") +
   labs(fill = "Status of waterpoint") +
   theme(legend.position = "top") +
   scale_fill_manual(values=color_label)
 
 # Create bar plot for source_type
-qplot(source_type, data=dummy, geom="bar", fill=status_group) + 
+qplot(source_type, data=train, geom="bar", fill=status_group) + 
   theme(legend.position = "top") + 
   labs(fill = "Status of waterpoint") +
   theme(axis.text.x=element_text(angle = 20, hjust = 1)) + 
@@ -84,7 +74,7 @@ qplot(source_type, data=dummy, geom="bar", fill=status_group) +
   ylab("Number of waterpoints")
 
 # Look at distribution of labels per total static head 
-ggplot(subset(dummy, amount_tsh <20000 & amount_tsh >0),
+ggplot(subset(train, amount_tsh <20000 & amount_tsh >0),
        aes(x = amount_tsh)) + 
   geom_histogram(bins = 20) +
   facet_wrap(~ status_group) +
@@ -105,15 +95,13 @@ dim(train)
 # Checking our second column amount_tsh
 str(train['amount_tsh'])
 table(train$amount_tsh)
-# From the below table we can say that it consist off more zeros so we can drop it
+# From the below table we can say that it consist of more zeros so we can drop it
 train <- train[ , !names(train) %in% c('amount_tsh')]
 
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('amount_tsh')]
 
-# dim(train) # Checking our dataset dimension
-
-# In public meeting we are removing that column 
+table(train$public_meeting)
 train <- train[ , !names(train) %in% c('public_meeting')]
 
 # Doing the same for test dataset
@@ -124,6 +112,7 @@ dim(train)
 # Checking permit column
 table(train$permit)
 # From below table we can see that there is a empty string and we can't take the mean values as it is boolean value
+# Also it has no relevance to teh prediction
 # So drop that column
 train <- train[ , !names(train) %in% c('permit')]
 
@@ -133,20 +122,19 @@ test <- test[ , !names(test) %in% c('permit')]
 dim(train)
 
 # Grouping extraction type,extraction type group and extraction type class
-View(data.frame(train$extraction_type,train$extraction_type_group,train$extraction_type_class))
-# We can say that three column have a common value and hence we can remove one column
+head(data.frame(train$extraction_type,train$extraction_type_group,train$extraction_type_class))
+# We can say that three columns are correlated and hence we can remove one column
 train <- train[ , !names(train) %in% c('extraction_type_group')]
 
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('extraction_type_group')]
 
-######################################## Get back to it later
 # Grouping management and management_group
-View(data.frame(train$management,train$management_group))
+head(data.frame(train$management,train$management_group))
 # We can't drop anything from above mentioned columns as they posses different values
 
 # Compare scheme name and scheme management
-View(data.frame(train$scheme_name,train$scheme_management))
+head(data.frame(train$scheme_name,train$scheme_management))
 table(train$scheme_name) # Checking the table of values for scheme_name
 table(train$scheme_management) # Checking the table of values for scheme_management
 # Since scheme_name consist of too many categorical values we can eliminate it
@@ -158,7 +146,7 @@ test <- test[ , !names(test) %in% c('scheme_name')]
 dim(train)
 
 # Comparing the payment and payment_type
-View(train[c('payment','payment_type')])
+head(train[c('payment','payment_type')])
 # Since we can infer that they both have a close relation so we can eliminate either of the column
 train <- train[ , !names(train) %in% c('payment')]
 
@@ -169,7 +157,7 @@ dim(train)
 dim(test)
 
 # Comparing the water_quality and quality_group
-View(train[c('water_quality','quality_group')])
+head(train[c('water_quality','quality_group')])
 # Since we can infer that they both have a close relation so we can eliminate either of the column
 train <- train[ , !names(train) %in% c('quality_group')]
 
@@ -180,36 +168,31 @@ dim(train)
 dim(test)
 
 # Comparing the quantity and quantity_group
-View(train[c('quantity','quantity_group')])
+head(train[c('quantity','quantity_group')])
 # Since we can infer that they both have a close relation so we can eliminate either of the column
 train <- train[ , !names(train) %in% c('quantity_group')]
 
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('quantity_group')]
 
-# dim(train)
-
 # Comparing the source_type, source and source_class
-View(train[c('source_type','source','source_class')])
+head(train[c('source_type','source','source_class')])
 # By comparing we can say that source_type and source are same so we can drop either of it but source_class defines type of the water source
 train <- train[ , !names(train) %in% c('source_type')]
 
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('source_type')]
 
-# dim(train)
-
-# Comparing the source_type, source and source_class
-View(train[c('waterpoint_type','waterpoint_type_group')])
-# By comparing we can say that source_type and source are same so we can drop either of it but source_class defines type of the water source
+# Comparing the waterpoint_type and waterpoint_type_group
+head(train[c('waterpoint_type','waterpoint_type_group')])
+# By comparing we can say that waterpoint type and waterpoint_type_group are same so we can drop either of them
 train <- train[ , !names(train) %in% c('waterpoint_type_group')]
 
 # Doing the same for test dataset
 test <- test[ , !names(test) %in% c('waterpoint_type_group')]
 
-# dim(train)
-
 # drop columns
+####Expalin why dropping those################
 train <- train[ , !names(train) %in% c('id','wpt_name','num_private','lga','ward','amount_tsh','subvillage','region','funder','installer')]
 
 # Doing the above for test data
@@ -219,12 +202,10 @@ dim(train)
 dim(test)
 
 # Converting the date to days
-train$date_recorded = as.numeric(as.Date(Sys.Date()) - as.Date(c(train$date_recorded)))
-test$date_recorded = as.numeric(as.Date(Sys.Date()) - as.Date(c(test$date_recorded)))
-View(train)
-View(test)
-
-# Replacing all 0 with NA
+train$date_recorded <- as.numeric(format(as.Date(train$date_recorded), "%Y"))
+test$date_recorded <- as.numeric(format(as.Date(test$date_recorded), "%Y"))
+head(train)
+head(test)
 
 # After analyzing we can say that 0's are present in two columns that is population and construction year so we consider their mean value
 replace_zeros <- function(x){
@@ -235,17 +216,21 @@ replace_zeros <- function(x){
   # Replacing the NA values to its respective mean
   x$population <- ifelse(is.na(x$population), round(mean(x$population, na.rm=TRUE)), x$population)
   x$construction_year <- ifelse(is.na(x$construction_year),round( mean(x$construction_year, na.rm=TRUE)), x$construction_year)
-  x$gps_height <- ifelse(is.na(x$gps_height),round( mean(x$gps_height, na.rm=TRUE)), x$gps_height)
   
   return(x) # returning the dataset
 }
 
 df_train <- replace_zeros(train)
 df_test <- replace_zeros(test)
-View(df_train)
-View(df_test)
+head(df_train)
+head(df_test)
 
-# Converting the categorical value of to top 4 categorical values 
+table(df_train$status_group)
+
+#This function takes as a parameter the dataset
+#It changes all the categorical values into lower case
+#It considers only the top levels in every categroical column, converting all the rest of the levels into "other"
+
 clean_dataset <- function(x){
   x$basin <- ifelse(x$basin == 'Lake Victoria','lake victoria',x$basin)
   x$basin <- ifelse(x$basin == 'Pangani','pangani',x$basin)
@@ -289,257 +274,49 @@ clean_dataset <- function(x){
   
   # Considering the waterpoint_type column
   x$waterpoint_type <- ifelse(x$waterpoint_type != 'communal standpipe' & x$waterpoint_type != 'hand pump','other_watertype',x$waterpoint_type)
+  
   return(x) # Returns the dataset
 }
 
 labels_rename <- function(x){
-  x$status_group <- ifelse(x$status_group == "functional",as.numeric(0),x$status_group)
-  x$status_group <- ifelse(x$status_group == "non functional",as.numeric(1),x$status_group)
-  x$status_group <- ifelse(x$status_group == "functional needs repair",as.numeric(2),x$status_group)
+  x$status_group <- ifelse(x$status_group == "functional",as.numeric(c(0)),x$status_group)
+  x$status_group <- ifelse(x$status_group == "non functional",as.numeric(c(1)),x$status_group)
+  x$status_group <- ifelse(x$status_group == "functional needs repair",as.numeric(c(2)),x$status_group)
   return(x)
 }
 
 cleaned_train <- clean_dataset(df_train)
 cleaned_test <- clean_dataset(df_test)
-cleaned_lab <- labels_rename(labels)
+cleaned_train <- labels_rename(cleaned_train)
 View(cleaned_train)
 View(cleaned_test)
-View(cleaned_lab)
+table(cleaned_train$status_group)
 
-# dmy <- dummyVars(" ~ .", data = customers, fullRank=T)
-# trsf <- data.frame(predict(dmy, newdata = customers))
+cleaned_train$status_group <- ifelse(cleaned_train$status_group == 3,1,cleaned_train$status_group)
+table(cleaned_train$status_group)
 
-# Performing one hot encoding
-# train_1h <- data.frame(predict(dummyVars(" ~ .", data = cleaned_train, fullRank = T), newdata = cleaned_train))
-train_dmy <- dummyVars(' ~ .',data = cleaned_train,fullRank = T)
+train_dmy <- caret::dummyVars(' ~ .',data = cleaned_train,fullRank = T)
 train_1h <- data.frame(predict(train_dmy, newdata = cleaned_train))
 
-test_dmy <- dummyVars(' ~ .',data = cleaned_test,fullRank = T)
+test_dmy <- caret::dummyVars(' ~ .',data = cleaned_test,fullRank = T)
 test_1h <- data.frame(predict(test_dmy, newdata = cleaned_test))
 
-train_1h <- data.frame(cbind(train_1h,as.factor(cleaned_lab$status_group))) # Considering the status as factor column
-names(train_1h)[36] <- 'status_group'
+train_1h$status_group <- as.factor(train_1h$status_group) # Considering the status as factor column
 
-####################
-# Machine Learning #
-####################
-# Performing train test and split the dataset
-dt = sort(sample(nrow(train_1h), nrow(train_1h)*.8))
-data_train<-train_1h[dt,]
-data_test<-train_1h[-dt,]
-#################
-# Random Forest #
-#################
+View(train_1h)
 
-library(randomForest)
-
-# Object random forest model
-rfm = randomForest(status_group~.,data = data_train,ntree=100)
-
-# Accuracy checking
-Y_pred <- predict(rfm,data_test[,-ncol(data_test)])
-Y <- data_test[,ncol(data_test)]
-
-# Building the confusion matrix
-confusion_matrix <- table(Y_pred,Y)
-confusion_matrix
-accuracy_randomForest = sum(diag(confusion_matrix)/sum(confusion_matrix))
-paste0('Accuracy Score for random forest using train test split : ',round(accuracy_randomForest*100),'%')
-
-# Hyperparameterizing
-accuracy_vec <- array(0,36)
-for (i in 1:36){ #print(i)
-  model <- randomForest(x=data_train[,-36],
-                        y=as.factor(data_train[,36]),
-                        xtest=data_test[,-36],
-                        ytest=as.factor(data_test[,36]),
-                        ntree=i)
-  
-  accuracy_vec[i] = (model$test$confusion[1,1]+model$test$confusion[2,2])/sum(model$test$confusion)
-}
-print(accuracy_vec)
-
-#################
-# ID3 Algorithm #
-#################
-
-library(rpart) # Package that is used to find the DT algorithm
-str(train_1h)
-
-# Train test split out dataset
-dtree <- rpart(status_group ~ ., data = data_train)
-
-# Predictions probability for DT
-dt_prob <- predict(dtree,data_test,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
-
-# Predictions for DT
-dt_pred <- predict(dtree,data_test)
-
-# Accuracy printing 
-pred <- predict(dtree,data_train,type='class')
-confusion_matrix_dt <- table(pred,data_train$status_group)
-confusion_matrix_dt
-accuracy_dt = sum(diag(confusion_matrix_dt)/sum(confusion_matrix_dt))
-paste0('Accuracy Score for Decision Tree using train test split : ',accuracy_dt*100,'%')
-
-prunedTree = prune(dtree,cp=0.01)
-pred = predict(prunedTree,data_test,type="class")
-confusion_matrix_dt_2 <- table(pred, data_test$status_group)
-accuracy_dt_2 = sum(diag(confusion_matrix_dt_2)/sum(confusion_matrix_dt_2))
-paste0('Accuracy Score of Decision Tree after pruning : ',accuracy_dt_2*100,'%')
-
-# Hyperparameterizing the ID3 algorithm using 10 cross validation
-n_trees <- 10 
-threshold <- 0.5
-
-spam_idx <- sample(1:nrow(train_1h))
-half_split <- floor(nrow(train_1h)/2)
-target_variable <- ncol(train_1h)
-
-feature_values <- seq(5,58,5)
-accuracy_vec <- numeric()
-
-for (features_per_tree in feature_values)
-{
-  Y_trees <- numeric()
-  
-  for(i in 1:n_trees){
-    #3.1 Sample the features
-    selected_features <- sample(1:(ncol(train_1h)-1),features_per_tree)
-    
-    #3.2 Take the first half of the dataset as a training data set with bootstrap for each tree
-    bootstrap_idx <- sample(1:half_split,replace = T)
-    train_data <- train_1h[spam_idx[bootstrap_idx],c(selected_features,target_variable)]
-    
-    #3.3 Take the second half of the dataset as a hold out or test data set
-    test_data <- train_1h[spam_idx[(half_split+1):nrow(train_1h)],c(selected_features,target_variable)]
-    
-    #3.4 Fit a model on the training set and evaluate it on the test set
-    model <- rpart(status_group ~ ., method="class",data=train_data)
-    Y_pred <- predict(model,subset(test_data, select=-c(status_group)))
-    
-    #3.5 Store the prediction of each tree (2 is to take only the P(Y="spam"|x))
-    Y_trees <- cbind(Y_trees,Y_pred[,2])
-  }
-  
-  # Calculate the ensemble prediction
-  Y_hat <- apply(Y_trees,1,mean)
-  Y_hat <- ifelse(Y_hat > threshold,"yes","no") 
-  
-  # Evaluate the predictions
-  Y <- test_data[,"status_group"]
-  confusion_matrix <- table(Y_hat,Y)
-  confusion_matrix
-  
-  accuracy = (confusion_matrix[1,1]+confusion_matrix[2,2])/sum(confusion_matrix)
-  misclassification_rate = 1 - accuracy
-  accuracy_vec <- cbind(accuracy_vec,accuracy)
-  # print(paste("[INFO] - Misclassification rate -",features_per_tree,"features :",misclassification_rate))
-  print(paste("[INFO] - Accuracy rate -",accuracy_vec,"Misclassification rate :",misclassification_rate))
-}
-
-#################
-# KNN Algorithm #
-#################
-
-library(class)
-Ypred_knn=knn(data_train,data_test,data_train$status_group,k=3)
-KNN <- table(Ypred_knn,data_test$status_group)
-knn_acc <- sum(diag(KNN)/sum(KNN))
-paste0('Accuracy Score for KNN using train test split : ',round(knn_acc*100),'%')
-
-dt_pred2 <- as.numeric(as.character(Ypred_knn))
-cross_valid_knn <- data.frame(rmse = RMSE(dt_pred2,label1),mae = MAE(dt_pred2,label1))
-print(cross_valid_knn)
-
-
-
-Data<-train_1h[sample(nrow(train_1h)),]
-
-#Create 10 equally size folds
-folds <- cut(seq(1,nrow(Data)),breaks=10,labels=FALSE)
-
-#Perform 10 fold cross validation
-for(i in 1:10){
-  #Segement your data by fold using the which() function
-  Idx <- which(folds==i,arr.ind=TRUE)
-  testData <- Data[Idx, ]
-  trainData <- Data[-Idx, ]
-  Ypred_knn=knn(trainData,testData,trainData$status_group,k=i)
-  KNN <- table(as.numeric(as.character(Ypred_knn)),testData$status_group)
-  knn_acc <- sum(diag(KNN)/sum(KNN))
-  dj <- sum(diag(dt_matrix)/sum(dt_matrix))
-}
-
-##########################
-# naive bayes classifier #
-##########################
-library(e1071)
-classifier_cl <- naiveBayes(status_group ~ ., data = data_train)
-classifier_cl
-y_pred <- predict(classifier_cl, newdata = data_test)
-
-# Confusion Matrix
-cm <- table(data_test$status_group, y_pred)
-cm
-acc_nb <- sum(diag(cm)/sum(cm))
-confusionMatrix(cm)
-plot(y_pred, data_test$status_group, main="Naive Bayes")
-
-#######################
-# Deep Neural Network #
-#######################
-
-# Library to be used
-library(keras)
-
-# Get the dataset
-dum <- data.frame(train_1h)
-
-# Change the data to matrix
-data <- as.matrix(dum)
-dimnames(data) <- NULL
-
-# Data partition
+# Data Partition 
+library(Matrix)
+library(xgboost)
+library(dplyr)
+library(magrittr)
 set.seed(1234)
-ind <- sample(2, nrow(data),replace = T,prob = c(0.8,0.2))
-training <- data[ind == 1, 1:35]
-test <- data[ind == 2,1:35]
-training_target <- data[ind == 1, 36]
-test_target <- data[ind == 2, 36]
+dt <- sample(2,nrow(train_1h),replace = T,prob = c(0.7,0.3))
+data_train<-train_1h[dt == 1,]
+data_test<-train_1h[dt == 2,]
 
-# One hot encoding for our target class
-trainlabels <- to_categorical(training_target)
-testlabels <- to_categorical(test_target)
+trainm <- sparse.model.matrix(status_group ~.,data = data_train)
 
-# Create model
-model <- keras_model_sequential()
-model %>% 
-  layer_dense(units = 8, activation = 'relu', input_shape =c(35)) %>%
-  layer_dense(units = 3, activation = 'softmax')
-summary(model)
-
-# Compile
-model %>%
-  compile(loss = 'categorical_crossentropy',optimizer = 'adam',
-          metrics = 'accuracy')
-
-# Fit the model 
-histoy <- model %>%
-  fit(training,trainlabels,epoch = 200, batch_size = 32,
-      validation_split = 0.2)
-plot(history)
-
-# Evaluate model with test data
-model1 <- model %>%
-  evaluate(test, testLabels)
-
-# Prediction & confusion matrix - test data
-prob <- model %>%
-  predict_proba(test)
-
-pred <- model %>%
-  predict_classes(test)
-table1 <- table(Predicted = pred, Actual = testtarget)
-
-cbind(prob, pred, testtarget)
+y <- train_1h$status_group
+label<-as.numeric(y)
+train.DMatrix <- xgb.DMatrix(data = data_train,label = label)
