@@ -81,6 +81,16 @@ ggplot(subset(train, amount_tsh <20000 & amount_tsh >0),
   xlab("Total Static Head") +
   ylab("Number of waterpoints")
 
+# To check the distribution of date recorded 
+# date_record <- as.data.frame(table(train$date_recorded))
+# ggplot(data=date_record, aes(x=Var1, y=Freq)) +
+#   geom_bar(stat="identity", fill="steelblue")+
+#   geom_text(aes(label=Freq), vjust=-0.3, size=3.5)+
+#   xlab("Unique Values of Date") +
+#   ylab("Frequency of creation of pump recorded (by year)")+
+#   theme_minimal()
+
+
 # To get the unique values of recorded_by
 unique(train['recorded_by'])
 # Since we can see that 'recorded_by' column has no unique elements present so we can drop.
@@ -328,7 +338,7 @@ folds <- cut(seq(1,nrow(Data)),breaks=10,labels=FALSE)
 #Perform 10 fold cross validation
 for(i in 1:10){
   
-  Ypred_knn=knn(data_train,data_test,data_train$status_group,k=i)
+  Ypred_knn = knn(data_train,data_test,data_train$status_group,k=i)
   KNN <- table(Ypred_knn,data_test$status_group)
   accuracy_arr[i] <- sum(diag(KNN)/sum(KNN))
 }
@@ -375,7 +385,18 @@ threshold <- 0.5
 
 View(Y_pred)
 
-Y_hat <- ifelse(Y_pred[,2] > threshold,"Yes","No") 
+# Y_hat <- ifelse(Y_pred[,2] > threshold,"Yes","No")
+Y_hat <- array(0,nrow(Y_pred))
+for(i in 1:nrow(Y_pred)){
+    if(Y_pred[i,1] > 0.5){
+      Y_pred$Y_hat <- 0
+    }else if(Y_pred[i,2] > 0.5){
+      Y_pred$Y_hat <- 1
+    }else if(Y_pred[i,3] > 0.5){
+      Y_pred$Y_hat <- 2
+    }
+}
+
 
 confusion_matrix <- table(Y_hat,Y)
 confusion_matrix
@@ -426,59 +447,6 @@ print(paste("Mean misclassification score for ID3 algorithm is:",1-mean(accuracy
 
 ###################################################################################################################################
 
-############################################################### GBM ###############################################################
-
-# Load the required lib
-library(dplyr) # for general data wrangling needs
-# Modeling packages
-library(gbm) # original implementation of regular & stochastic GBMs library(h2o) # for a java-based implementation of GBM variants library(xgboost) # for fitting extreme gradient boosting
-
-
-set.seed(123) # for reproducibility 
-ames_gbm1 <- gbm(
-  formula = status_group ~ .,
-  data = data_train,
-  distribution = "multinomial", # Since our output consist of functional,non-functional and functional need to be repaired so we are assigning it as multinomial
-  n.trees = 300, # The tree value can be given more but nature of the gradient boosting model, that the model can be evaluated by using first n trees.
-  shrinkage = 0.1, # It reduces the size of incremental steps so that each iteration is important.
-  interaction.depth = 3, # denotes us the number of splits it has to perform on a tree. It starts from the starting node 
-  n.minobsinnode = 10, # It tells us the minimum number of observations in trees
-  cv.folds = 10 # Cross validation value
-)
-
-# find index for number trees with minimum CV error
-best <- which.min(ames_gbm1$cv.error)
-
-# get MSE and compute RMSE
-sqrt(ames_gbm1$cv.error[best])
-
-# Predictions of GBM
-pred <- predict(ames_gbm1, data_test, 300)
-pred
-
-# least squares error
-print( paste0 ( 'Least Square Error for Gradient Boosting is: ',sum ( ( data_test$status_group - pred )^2 ) ))
-
-# plot error curve
-gbm.perf(ames_gbm1, method = "cv")
-
-# Plot relative influence of each variable
-par(mfrow = c(1, 2))
-summary(ames_gbm1, n.trees = 1)
-summary(ames_gbm1,best)
-
-# Compactly print the first and last trees for curiosity
-print(pretty.gbm.tree(ames_gbm1, i.tree = 1))
-print(pretty.gbm.tree(ames_gbm1, i.tree = ames_gbm1$n.trees))
-
-# Accuracy Score
-labels = colnames(pred)[apply(pred, 1, which.max)]
-cm = confusionMatrix(data_test$status_group, as.factor(labels))
-cm
-############################################################### GBM ###############################################################
-
-###################################################################################################################################
-
 ############################################################### XGB ###############################################################
 
 library(xgboost)
@@ -499,21 +467,22 @@ Xtreme <- xgboost(data = matrix[,1:35],
                   max_depth = 36,
                   eta = 0.02,
                   nthread = 12,
-                  objective = "multi:softmax",
+                  objective = "multi:softprob",
                   num_class =3,
                   subsample = 0.7,
                   colsample_bytree = 0.5,
                   min_child_weight = 3,
-                  nrounds = 200, 
+                  nrounds = 50,
                   maximize = FALSE)
 
-pred <- round(predict(Xtreme, testData))
+pred <- predict(Xtreme, testData,reshape = T)
+pred = as.data.frame(pred)
+colnames(pred) = levels(train_1h$status_group)
+pred$prediction = apply(pred,1,function(x) colnames(pred)[which.max(x)])
+confusion_matrix <- table(pred$prediction,data.test[,36])
+confusion_matrix
 
-XGAccuracy <- mean(pred==testMatrix[,36])*100
-XGAccuracy
-
-confusion <- table(pred, testMatrix[,36])
-confusionMatrix(confusion)
-
+acc <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste0('Accuracy score is ',acc*100,'%'))
 ############################################################### XGB ###############################################################
 ###################################################################################################################################
