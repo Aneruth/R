@@ -478,3 +478,42 @@ cm
 ############################################################### GBM ###############################################################
 
 ###################################################################################################################################
+
+############################################################### XGB ###############################################################
+
+library(xgboost)
+ind <- sample(2, nrow(train_1h), replace = TRUE, prob= c(0.7,0.3))
+data.train <- train_1h[ind==1,]
+data.test <- train_1h[ind==2,]
+data.train <- sapply(data.train, as.numeric)
+data.train[,36] <- data.train[,36] - 1
+matrix<-data.matrix(data.train)
+data.test <- sapply(data.test, as.numeric)
+data.test[,36] <- data.test[,36] - 1
+testMatrix <- data.matrix(data.test)
+testData <- xgb.DMatrix(testMatrix[,1:35])
+
+Xtreme <- xgboost(data = matrix[,1:35],
+                  nfold =5,
+                  label = matrix[,36],
+                  max_depth = 36,
+                  eta = 0.02,
+                  nthread = 12,
+                  objective = "multi:softmax",
+                  num_class =3,
+                  subsample = 0.7,
+                  colsample_bytree = 0.5,
+                  min_child_weight = 3,
+                  nrounds = 200, 
+                  maximize = FALSE)
+
+pred <- round(predict(Xtreme, testData))
+
+XGAccuracy <- mean(pred==testMatrix[,36])*100
+XGAccuracy
+
+confusion <- table(pred, testMatrix[,36])
+confusionMatrix(confusion)
+
+############################################################### XGB ###############################################################
+###################################################################################################################################
