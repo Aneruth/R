@@ -315,6 +315,22 @@ train_1h$status_group <- as.factor(train_1h$status_group) # Considering the stat
 
 View(train_1h)
 
+ggplot(cleaned_train,
+       aes(x = basin, fill = status_group)) + 
+  geom_bar() +
+  xlab("Basin") +
+  ylab("Number of waterpoints") +
+  labs(fill = "Status of waterpoint") +
+  theme(legend.position = "top") +
+  scale_fill_manual(values=color_label)
+
+qplot(basin, data=cleaned_train, geom="bar", fill=status_group) + 
+  theme(legend.position = "top") + 
+  labs(fill = "Status of waterpoint") +
+  theme(axis.text.x=element_text(angle = 20, hjust = 1)) + 
+  scale_fill_manual(values=color_label) + 
+  xlab("Basin") +
+  ylab("Number of waterpoints")
 ###################################################################################################################################
 
 ###################################################### TRAIN TEST SPLIT ###########################################################
@@ -326,46 +342,6 @@ data_test<-train_1h[-dt,]
 
 ###################################################################################################################################
 
-############################################################### KNN ###############################################################
-library(class)
-Data<-train_1h[sample(nrow(train_1h)),]
-
-accuracy_arr <- array(0,10)
-
-#Create 10 equally size folds
-folds <- cut(seq(1,nrow(Data)),breaks=10,labels=FALSE)
-
-#Perform 10 fold cross validation
-for(i in 1:10){
-  
-  Ypred_knn = knn(data_train,data_test,data_train$status_group,k=i)
-  KNN <- table(Ypred_knn,data_test$status_group)
-  accuracy_arr[i] <- sum(diag(KNN)/sum(KNN))
-}
-
-print(paste0('Accuracy score for 10 values is: ',list(accuracy_arr),' and max value is: ',max(accuracy_arr),' at index: ',which(accuracy_arr == max(accuracy_arr))))
-
-selected_k <- 9
-  #Create 10 equally size folds
-  folds <- cut(seq(1,nrow(Data)),breaks=10,labels=FALSE)
-accuracy_arr <- array(0,10)
-
-for (i in 1:10){
-  #Segement your data by fold using the which() function
-  Idx <- which(folds==i,arr.ind=TRUE)
-  testData <- Data[Idx, ]
-  trainData <- Data[-Idx, ]
-  
-  Ypred_knn=knn(trainData,testData,trainData$status_group,k=selected_k)
-  KNN <- table(Ypred_knn,testData$status_group)
-  accuracy_arr[i] <- sum(diag(KNN)/sum(KNN))
-}
-
-print(paste('Average accuracy score for cross validation = ',mean(accuracy_arr)))
-############################################################### KNN ###############################################################
-
-###################################################################################################################################
-
 ############################################################### ID3 ###############################################################
 library(rpart)
 
@@ -374,9 +350,6 @@ printcp(id3) # display the results
 plotcp(id3) # visualize cross-validation results
 summary(id3) # detailed summary of splits
 
-# Predictions probability for DT
-dt_prob <- predict(id3,data_test,type = 'prob') # We get the output as probability where the first one identifies factor 0 ,second one as factor 1 and third one as factor 2
-View(dt_prob)
 # plot tree
 plot(id3, uniform=TRUE,
      main="Classification Tree - Rpart")
@@ -388,24 +361,22 @@ threshold <- 0.5
 
 View(Y_pred)
 
-# Y_hat <- ifelse(Y_pred[,2] > threshold,"Yes","No")
-Y <- array(0,nrow(Y_pred))
+Y_hat <- array(0,nrow(Y_pred))
 for(i in 1:nrow(Y_pred)){
-    if(Y_pred[i,1] > threshold){
-      Y_hat[i] <- 0
-    }else if(Y_pred[i,2] > threshold){
-      Y_hat[i] <- 1
-    }else if(Y_pred[i,3] > threshold){
-      Y_hat[i] <- 2
-    }
+  if(Y_pred[i,1] > threshold){
+    Y_hat[i] <- 0
+  }else if(Y_pred[i,2] > threshold){
+    Y_hat[i] <- 1
+  }else if(Y_pred[i,3] > threshold){
+    Y_hat[i] <- 2
+  }
 }
-
 # Creating a new dataframe 
-y <- data.frame(Y_pred)
+new_Yhat <- data.frame(Y_pred)
 # Appending the Y_hat to newly created dataframe
-y$Y_hat <- Y_hat
+new_Yhat$pred_val <- Y_hat
 
-confusion_matrix <- table(Y_hat,Y)
+confusion_matrix <- table(new_Yhat$pred_va,Y)
 confusion_matrix
 
 accuracy = sum(diag(confusion_matrix))/sum(confusion_matrix)
@@ -413,15 +384,29 @@ misclassification_rate = 1 - accuracy
 print(paste0('Accuracy score for ID3 algorithm is: ',accuracy))
 print(paste0('Misclassification score for ID3 algorithm is: ',misclassification_rate))
 
+# hyper parameter tuning of diff threshold values form 0.1 to 0.9
+new_Yhat <- array(0,nrow(Y_pred))
+acc_new <- array(0,6)
+for(j in seq(0.1,1.0,0.1)){
+  for(i in 1:nrow(Y_pred))  {
+    if(Y_pred[i,1] > j){
+      new_Yhat[i] <- 0
+    }else if(Y_pred[i,2] > j){
+      new_Yhat[i] <- 1
+    }else if(Y_pred[i,3] > j){
+      new_Yhat[i] <- 2
+    }
+  }
+  rix <- table(new_Yhat,Y)
+  acc_new[i] = sum(diag(rix))/sum(rix)
+  print(paste0('Accuracy score at threshold value ',j,' is ',acc_new[i]))
+}
 
-# diff threshold values form 0.1 to 0.9 ith loop 
-
-
-# Cross Validation
-k = 10
+####### K cross Validation
+k <- 10
 target_variable <- ncol(train_1h)
-accuracy_vec <- array(0,k)
-threshold <- misclassification_rate
+accuracy_arr <- array(0,10)
+threshold <- 0.7
 
 tree_index <- sample(1:nrow(train_1h)) # Arranging the dataset randomly.
 
@@ -429,12 +414,12 @@ tree_index <- sample(1:nrow(train_1h)) # Arranging the dataset randomly.
 max <- ceiling(nrow(train_1h)/k)
 splits <- split(tree_index, ceiling(seq_along(tree_index)/max))
 
-for (i in 1:k){
+for (idx in 1:k){
   # Take the group as a stock or test set
-  test_data <- train_1h[splits[[i]],]
+  test_data <- train_1h[splits[[idx]],]
   
   # Take the remaining groups as a training data set
-  train_data <- train_1h[-splits[[i]],]
+  train_data <- train_1h[-splits[[idx]],]
   print(paste("Training set size:",dim(train_data)[1],"- Testing set size",dim(test_data)[1]))
   
   # Fitting and evaluate a model in the training set.
@@ -443,62 +428,21 @@ for (i in 1:k){
   Y <- test_data[,target_variable]
   
   # Storing our prediction values of the tree
-  Y_hat <- ifelse(Y_pred[,2] > threshold,"Yes","No") 
-  confusion_matrix <- table(Y_hat,Y)
-  print(confusion_matrix)
-  
-  # Keeping our evaluation score and popping out the completed model
-  accuracy_vec[i] = sum(diag(confusion_matrix))/sum(confusion_matrix)
-  misclassification_rate = 1 - accuracy_vec[i]
-  print(paste("Accuracy rate at -",i,"fold:",accuracy_vec[i]))
+  y_hat <- array(0,nrow(Y_pred))
+  for(i in 1:nrow(Y_pred))  {
+    if(Y_pred[i,1] > threshold){
+      y_hat[i] <- 0
+    }else if(Y_pred[i,2] > threshold){
+      y_hat[i] <- 1
+    }else if(Y_pred[i,3] > threshold){
+      y_hat[i] <- 2
+    }
+  }
+  rix <- table(y_hat,Y)
+  accuracy_arr[idx] = sum(diag(rix))/sum(rix)
+  print(paste0("Accuracy rate at ",idx," fold: ",accuracy_arr[idx]))
 }
 
 # Accomplish the model's competence by using model assessment scores sample.
-print(paste("Mean misclassification score for ID3 algorithm is:",1-mean(accuracy_vec)))
-############################################################### ID3 ###############################################################
-
+print(paste("Mean accuracy score for ID3 algorithm is:",mean(accuracy_arr)))
 ###################################################################################################################################
-
-############################################################### XGB ###############################################################
-
-library(xgboost)
-ind <- sample(2, nrow(train_1h), replace = TRUE, prob= c(0.7,0.3))
-data.train <- train_1h[ind==1,]
-data.test <- train_1h[ind==2,]
-data.train <- sapply(data.train, as.numeric)
-data.train[,36] <- data.train[,36] - 1
-matrix<-data.matrix(data.train)
-data.test <- sapply(data.test, as.numeric)
-data.test[,36] <- data.test[,36] - 1
-testMatrix <- data.matrix(data.test)
-testData <- xgb.DMatrix(testMatrix[,1:35])
-
-Xtreme <- xgboost(data = matrix[,1:35],
-                  nfold =5,
-                  label = matrix[,36],
-                  max_depth = 36,
-                  eta = 0.02,
-                  nthread = 12,
-                  objective = "multi:softprob",
-                  num_class =3,
-                  subsample = 0.7,
-                  colsample_bytree = 0.5,
-                  min_child_weight = 3,
-                  nrounds = 50,
-                  maximize = FALSE)
-
-pred <- predict(Xtreme, testData,reshape = T)
-pred = as.data.frame(pred)
-colnames(pred) = levels(train_1h$status_group)
-pred$prediction = apply(pred,1,function(x) colnames(pred)[which.max(x)])
-confusion_matrix <- table(pred$prediction,data.test[,36])
-confusion_matrix
-
-acc <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
-print(paste0('Accuracy score is ',acc*100,'%'))
-############################################################### XGB ###############################################################
-###################################################################################################################################
-
-
-plot(kth,accuracy_arr,xlab = 'Kth value',ylab = 'Accuracy Score')
-lines(kth,accuracy_arr,xlab = 'Kth value',ylab = 'Accuracy Score')
